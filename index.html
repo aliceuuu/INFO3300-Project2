@@ -18,7 +18,18 @@
   .gridlines .domain {
     stroke: none;
   }
-
+  line.link {
+      stroke: #222;
+      stroke-width: 1px;
+  }
+  circle.node {
+      stroke: black;
+      stroke-width: 1px;
+  }
+  rect.activeRegion {
+    fill: none;
+    pointer-events: all;
+  }
 
   line.avgline {
       stroke: black;
@@ -43,7 +54,7 @@
 
 <body>
   <div id="pulldown-bar">
-  <select id="sort-select" style="width:260px;">
+  <select id="sort-select" style="width:400px;">
     <option value="sortPVI" selected>Sort by Cook Partisan Voting Index</option>
     <option value="sortAlpha">Sort by Alphabetically</option>
     <option value="sortTotalDose">Sort by Total Doses Delivered</option>
