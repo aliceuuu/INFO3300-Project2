@@ -73,22 +73,33 @@
     const requestData = async () => {
       var redBlueData = await d3.csv("state_redBlue.csv", d3.autoType);
       var vaccineData = await d3.csv("covid19_vaccinations_in_the_united_states .csv", d3.autoType);
-      console.log(redBlueData);
-      console.log(vaccineData);
-      const pviExtent = d3.extent(redBlueData, d => d['pvi']);
-      const avgPvi = d3.mean(redBlueData, d => d['pvi']);
+      merge_data = redBlueData;
+      merge_data.forEach((d1, i) => {
+        vaccineData.forEach((d2, i) => {
+          if(d2.State === d1.State) {
+            d1['Total Doses Delivered'] = d2['Total Doses Delivered']
+            d1['Percent of Total Pop with at least One Dose by State of Residence'] = d2['Percent of Total Pop with at least One Dose by State of Residence']
+            d1['Percent of Total Pop Fully Vaccinated by State of Residence'] = d2['Percent of Total Pop Fully Vaccinated by State of Residence']
+
+          }
+        });
+
+      });
+      console.log("merge")
+      console.log(merge_data)
+
+      const pviExtent = d3.extent(merge_data, d => d['pvi']);
+      const avgPvi = d3.mean(merge_data, d => d['pvi']);
       const pviDist = Math.max( Math.abs(pviExtent[0] - avgPvi), Math.abs(pviExtent[1] - avgPvi) );
 
       const adjustedPviExtent = [avgPvi - pviDist, avgPvi + pviDist];
       const pviScale = d3.scaleLinear().domain(adjustedPviExtent).range([chartHeight, 0]);
-      redBlueData.sort( (a,b) => d3.ascending(a['pvi'],b['pvi']) )
-      const states = d3.map(redBlueData, d => d.State)
+      merge_data.sort( (a,b) => d3.ascending(a['pvi'],b['pvi']) )
+      const states = d3.map(merge_data, d => d.State)
       const stateScale = d3.scalePoint().domain(states).range([0, chartWidth])
                                        .padding(0.1);
       let leftAxis = d3.axisLeft(pviScale);
-      // let leftGridlines = d3.axisLeft(pviScale)
-      //                       .tickSize(-chartWidth-10)
-      //                       .tickFormat("")
+
       let leftAxisG = annotations.append("g")
                                    .attr("class", "y axis")
                                    .attr("transform",`translate(${margin.left-10},${margin.top})`)
@@ -98,7 +109,7 @@
                                    .attr("class", "x axis")
                                    .attr("transform",`translate(${margin.left},${chartHeight+margin.top+10})`)
                                    .call(bottomAxis);
-      let midline = chartArea.selectAll("line.avgline").data(redBlueData)
+      let midline = chartArea.selectAll("line.avgline").data(merge_data)
            .join(
              enter => enter.append("line")
                            .attr("class","avgline")
@@ -107,20 +118,17 @@
            .attr("x2", chartWidth+10)
            .attr("y1", pviScale(avgPvi) )
            .attr("y2", pviScale(avgPvi) );
-      let rec = chartArea.selectAll("rect.activeRegion").data(redBlueData)
+      let rec = chartArea.selectAll("rect.activeRegion").data(merge_data)
                           .join(
                              enter => enter.append("rect")
                                            .attr("class","activeRegion")
-                                           // .attr("x",100)
-                                           // .attr("y",200)
-                                           // .attr("height",100)
                                            .attr("x", d => stateScale(d.State)-10)
                                            .attr("y", d => Math.min( pviScale(avgPvi), pviScale(d['pvi']) ))
                                            .attr("height", d => Math.abs( pviScale(avgPvi) - pviScale(d['pvi']) ))
                                            .attr("width", 20 )
                                            .attr("fill","none")
                                          )
-      let lines = chartArea.selectAll("line.link").data(redBlueData)
+      let lines = chartArea.selectAll("line.link").data(merge_data)
            .join(
              enter => enter.append("line")
                            .attr("class","link")
@@ -129,7 +137,7 @@
            .attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
            .attr("y1", pviScale(avgPvi)).attr("y2", d => pviScale(d.pvi));
 
-      let circles = chartArea.selectAll("circle.node").data(redBlueData)
+      let circles = chartArea.selectAll("circle.node").data(merge_data)
              .join(
                 enter => enter.append("circle")
                               .attr("class","node")
@@ -165,7 +173,7 @@
       function updateMouseover(d) {
         textbox.html('');
         let stateName = `State: ${d['State']}`;
-        if(d['pvi']==null) {
+          let pvi = `Cook Partisan Voting Index: ${format(d['pvi'])}`
           let totalD = `Total Doses Delivered: ${format(d['Total Doses Delivered'])}`
           let onepren = `Percent of Total Pop with at least One Dose by State of Residence: ${format(d['Percent of Total Pop with at least One Dose by State of Residence'])}`
           let twopren = `Percent of Total Pop Fully Vaccinated by State of Residence: ${format(d['Percent of Total Pop Fully Vaccinated by State of Residence'])}`
@@ -174,32 +182,14 @@
 
           textbox.append("text").text(stateName)
                  .attr("x", 0).attr("y", 10);
-          textbox.append("text").text(totalD)
-                 .attr("x", 0).attr("y", 30);
-          textbox.append("text").text(onepren)
-                 .attr("x", 0).attr("y", 50);
-          textbox.append("text").text(twopren)
-                 .attr("x", 0).attr("y", 70);
-        } else {
-          let pvi = `Cook Partisan Voting Index: ${format(d['pvi'])}`
-
-          let maxWidth = Math.max( stringLen(stateName),stringLen(pvi) )
-          frame.attr("width", maxWidth+20);
-
-          textbox.append("text").text(stateName)
-                 .attr("x", 0).attr("y", 10);
           textbox.append("text").text(pvi)
                  .attr("x", 0).attr("y", 30);
-
-        }
-        // textbox.append("text").text(diff)
-        //        .attr("x", 0).attr("y", 50);
-        // textbox.append("text").text(evote)
-        //        .attr("x", 0).attr("y", 70);
-        // textbox.append("text").text(pop)
-        //        .attr("x", 0).attr("y", 90);
-        // textbox.append("text").text(ppv)
-        //        .attr("x", 0).attr("y", 110);
+          textbox.append("text").text(totalD)
+                 .attr("x", 0).attr("y", 50);
+          textbox.append("text").text(onepren)
+                 .attr("x", 0).attr("y", 70);
+          textbox.append("text").text(twopren)
+                 .attr("x", 0).attr("y", 90);
 
       }
       circles.on("mouseover", function(d) {
@@ -225,9 +215,9 @@
         var option = d3.select(this).property("value")
         var data;
         if (option === "sortPVI") {
-          redBlueData.sort( (a,b) => d3.ascending(a['pvi'],b['pvi']) )
-          data = redBlueData;
-          console.log(redBlueData)
+          merge_data.sort( (a,b) => d3.ascending(a['pvi'],b['pvi']) )
+          data = merge_data;
+          console.log(merge_data)
           newStates = d3.map(data, d => d.State)
           stateScale.domain(newStates);
           bottomAxis.scale(stateScale);
@@ -235,19 +225,19 @@
           leftAxis.scale(pviScale).tickFormat(d3.format("~f"));
           leftAxisG.transition().call(leftAxis);
 
-          midline.data(data).attr("x1",0).attr("x2", chartWidth+10)
+          midline.attr("x1",0).attr("x2", chartWidth+10)
                                  .attr("y1", pviScale(avgPvi)).attr("y2", pviScale(avgPvi));
-          circles.data(data).attr("transform", d => `translate(${stateScale(d.State)},${pviScale(d['pvi'])})`);
-          rec.data(data).attr("x", d => stateScale(d.State)-10)
+          circles.attr("transform", d => `translate(${stateScale(d.State)},${pviScale(d['pvi'])})`);
+          rec.attr("x", d => stateScale(d.State)-10)
                         .attr("y", d => Math.min( pviScale(avgPvi), pviScale(d['pvi']) ))
                         .attr("height", d => Math.abs( pviScale(avgPvi) - pviScale(d['pvi']) ))
-          lines.data(data).attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
+          lines.attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
                                  .attr("y1",pviScale(avgPvi)).attr("y2", d => pviScale(d['pvi']));
         }
         if (option === "sortAlpha") {
-          redBlueData.sort( (a,b) => d3.ascending(a['State'],b['State']) );
-          data = redBlueData;
-          console.log(redBlueData)
+          merge_data.sort( (a,b) => d3.ascending(a['State'],b['State']) );
+          data = merge_data;
+          console.log(merge_data)
           newStates = d3.map(data, d => d.State)
           stateScale.domain(newStates);
           bottomAxis.scale(stateScale);
@@ -255,19 +245,19 @@
           leftAxis.scale(pviScale).tickFormat(d3.format("~f"));
           leftAxisG.transition().call(leftAxis);
 
-          midline.data(data).attr("x1",0).attr("x2", chartWidth+10)
+          midline.attr("x1",0).attr("x2", chartWidth+10)
                                  .attr("y1", pviScale(avgPvi)).attr("y2", pviScale(avgPvi));
-          circles.data(data).attr("transform", d => `translate(${stateScale(d.State)},${pviScale(d['pvi'])})`);
-          rec.data(data).attr("x", d => stateScale(d.State)-10)
+          circles.attr("transform", d => `translate(${stateScale(d.State)},${pviScale(d['pvi'])})`);
+          rec.attr("x", d => stateScale(d.State)-10)
                         .attr("y", d => Math.min( pviScale(avgPvi), pviScale(d['pvi']) ))
                         .attr("height", d => Math.abs( pviScale(avgPvi) - pviScale(d['pvi']) ))
-          lines.data(data).attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
+          lines.attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
                                  .attr("y1",pviScale(avgPvi)).attr("y2", d => pviScale(d['pvi']));
         }
         else if (option === "sortTotalDose") {
-          vaccineData.sort( (a,b) => d3.ascending(a['Total Doses Delivered'],b['Total Doses Delivered']) );
-          data = vaccineData;
-          console.log(vaccineData);
+          merge_data.sort( (a,b) => d3.ascending(a['Total Doses Delivered'],b['Total Doses Delivered']) );
+          data = merge_data;
+          console.log(merge_data);
           dosesExten = d3.extent(data, d => d['Total Doses Delivered']);
           console.log(dosesExten)
           const dosesScale = d3.scaleLog().domain(dosesExten).range([chartHeight,0]);
@@ -276,24 +266,24 @@
           bottomAxis.scale(stateScale);
           bottomAxisG.transition().call(bottomAxis)
 
-          const avgDose = d3.mean(vaccineData, d => d['Total Doses Delivered']);
+          const avgDose = d3.mean(merge_data, d => d['Total Doses Delivered']);
 
           leftAxis.scale(dosesScale).tickFormat(d3.format("~f"));
           leftAxisG.transition().call(leftAxis);
-          midline.data(data).attr("x1",0).attr("x2", chartWidth+10)
+          midline.attr("x1",0).attr("x2", chartWidth+10)
                                  .attr("y1", dosesScale(avgDose)).attr("y2", dosesScale(avgDose));
-          circles.data(data).attr("transform", d => `translate(${stateScale(d.State)},${dosesScale(d['Total Doses Delivered'])})`);
-          rec.data(data).attr("x", d => stateScale(d.State)-10)
+          circles.attr("transform", d => `translate(${stateScale(d.State)},${dosesScale(d['Total Doses Delivered'])})`);
+          rec.attr("x", d => stateScale(d.State)-10)
                         .attr("y", d => Math.min( dosesScale(avgDose), dosesScale(d['Total Doses Delivered']) ))
                         .attr("height", d => Math.abs( dosesScale(avgDose) - dosesScale(d['Total Doses Delivered']) ))
-          lines.data(data).attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
+          lines.attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
                                  .attr("y1",dosesScale(avgDose)).attr("y2", d => dosesScale(d['Total Doses Delivered']));
 
         }
         else if (option === "sortDosePrecent") {
-          vaccineData.sort( (a,b) => d3.ascending(a['Percent of Total Pop with at least One Dose by State of Residence'],b['Percent of Total Pop with at least One Dose by State of Residence']) );
-          data = vaccineData;
-          console.log(vaccineData);
+          merge_data.sort( (a,b) => d3.ascending(a['Percent of Total Pop with at least One Dose by State of Residence'],b['Percent of Total Pop with at least One Dose by State of Residence']) );
+          data = merge_data;
+          console.log(merge_data);
           dosesExten = d3.extent(data, d => d['Percent of Total Pop with at least One Dose by State of Residence']);
           console.log(dosesExten)
           const dosesScale = d3.scaleLinear().domain(dosesExten).range([chartHeight,0]);
@@ -302,22 +292,22 @@
           bottomAxis.scale(stateScale);
           bottomAxisG.transition().call(bottomAxis)
 
-          const avgDose = d3.mean(vaccineData, d => d['Percent of Total Pop with at least One Dose by State of Residence']);
+          const avgDose = d3.mean(merge_data, d => d['Percent of Total Pop with at least One Dose by State of Residence']);
           leftAxis.scale(dosesScale).tickFormat(function(d) { return d + "%"; });
           leftAxisG.transition().call(leftAxis);
-          midline.data(data).attr("x1",0).attr("x2", chartWidth+10)
+          midline.attr("x1",0).attr("x2", chartWidth+10)
                                  .attr("y1", dosesScale(avgDose)).attr("y2", dosesScale(avgDose));
-          circles.data(data).attr("transform", d => `translate(${stateScale(d.State)},${dosesScale(d['Percent of Total Pop with at least One Dose by State of Residence'])})`);
-          rec.data(data).attr("x", d => stateScale(d.State)-10)
+          circles.attr("transform", d => `translate(${stateScale(d.State)},${dosesScale(d['Percent of Total Pop with at least One Dose by State of Residence'])})`);
+          rec.attr("x", d => stateScale(d.State)-10)
                         .attr("y", d => Math.min( dosesScale(avgDose), dosesScale(d['Percent of Total Pop with at least One Dose by State of Residence']) ))
                         .attr("height", d => Math.abs( dosesScale(avgDose) - dosesScale(d['Percent of Total Pop with at least One Dose by State of Residence']) ))
-          lines.data(data).attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
+          lines.attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
                                  .attr("y1",dosesScale(avgDose)).attr("y2", d => dosesScale(d['Percent of Total Pop with at least One Dose by State of Residence']));
         }
         else if (option === "sortDosePrecentTwo") {
-          vaccineData.sort( (a,b) => d3.ascending(a['Percent of Total Pop Fully Vaccinated by State of Residence'],b['Percent of Total Pop Fully Vaccinated by State of Residence']) );
-          data = vaccineData;
-          console.log(vaccineData);
+          merge_data.sort( (a,b) => d3.ascending(a['Percent of Total Pop Fully Vaccinated by State of Residence'],b['Percent of Total Pop Fully Vaccinated by State of Residence']) );
+          data = merge_data;
+          console.log(merge_data);
           dosesExten = d3.extent(data, d => d['Percent of Total Pop Fully Vaccinated by State of Residence']);
           console.log(dosesExten)
           const dosesScale = d3.scaleLinear().domain(dosesExten).range([chartHeight,0]);
@@ -326,16 +316,16 @@
           bottomAxis.scale(stateScale);
           bottomAxisG.transition().call(bottomAxis)
 
-          const avgDose = d3.mean(vaccineData, d => d['Percent of Total Pop Fully Vaccinated by State of Residence']);
+          const avgDose = d3.mean(merge_data, d => d['Percent of Total Pop Fully Vaccinated by State of Residence']);
           leftAxis.scale(dosesScale).tickFormat(function(d) { return d + "%"; });
           leftAxisG.transition().call(leftAxis);
-          midline.data(data).attr("x1",0).attr("x2", chartWidth+10)
+          midline.attr("x1",0).attr("x2", chartWidth+10)
                                  .attr("y1", dosesScale(avgDose)).attr("y2", dosesScale(avgDose));
-          circles.data(data).attr("transform", d => `translate(${stateScale(d.State)},${dosesScale(d['Percent of Total Pop Fully Vaccinated by State of Residence'])})`);
-          rec.data(data).attr("x", d => stateScale(d.State)-10)
+          circles.attr("transform", d => `translate(${stateScale(d.State)},${dosesScale(d['Percent of Total Pop Fully Vaccinated by State of Residence'])})`);
+          rec.attr("x", d => stateScale(d.State)-10)
                         .attr("y", d => Math.min( dosesScale(avgDose), dosesScale(d['Percent of Total Pop Fully Vaccinated by State of Residence']) ))
                         .attr("height", d => Math.abs( dosesScale(avgDose) - dosesScale(d['Percent of Total Pop Fully Vaccinated by State of Residence']) ))
-          lines.data(data).attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
+          lines.attr("x1",d => stateScale(d.State)).attr("x2", d => stateScale(d.State))
                                  .attr("y1",dosesScale(avgDose)).attr("y2", d => dosesScale(d['Percent of Total Pop Fully Vaccinated by State of Residence']));
         }
 
